@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Viewer</title>
+    <link rel="icon" href="/static/images/favicon.ico" type="image/x-icon">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* === 基础样式 === */
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: "Consolas", "Segoe UI", sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: #f4f4f4; }
+          header { 
+        background: #222; 
+        color: #fff; 
+        height: 50px; 
+        display: flex; 
+        align-items: center; 
+        padding: 0 20px; 
+        flex-shrink: 0; 
+    }
+
+    /* 左侧 Logo */
+    .header-left {
+        flex: 1; /* 占据 1/3 空间 */
+        display: flex;
+        align-items: center;
+        font-weight: bold;
+    }
+
+    /* 中间 按钮组 */
+    .header-center {
+        flex: 1; /* 占据 1/3 空间 */
+        display: flex;
+        justify-content: center; /* 居中对齐 */
+    }
+
+    /* 右侧 用户信息 */
+    .header-right {
+        flex: 1; /* 占据 1/3 空间 */
+        display: flex;
+        justify-content: flex-end; /* 靠右对齐 */
+        align-items: center;
+    }
+
+    /* 按钮组样式微调 */
+    .btn-group { 
+        display: flex; 
+        background: #444; 
+        border-radius: 4px; 
+        padding: 2px; 
+    }
+        .mode-btn { background: transparent; border: none; color: #aaa; padding: 5px 15px; cursor: pointer; border-radius: 3px; font-size: 13px; }
+        .mode-btn.active { background: #007bff; color: white; font-weight: bold; }
+        .main-layout { display: flex; flex: 1; height: calc(100vh - 50px); overflow: hidden; }
+        .sidebar { width: 300px; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; flex-shrink: 0; }
+        .nav-path { padding: 10px; background: #f0f0f0; border-bottom: 1px solid #ddd; font-size: 12px; word-break: break-all; }
+        .file-list { flex: 1; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
+        .list-item { padding: 10px 15px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; align-items: center; font-size: 14px; color: #333; }
+        .list-item:hover { background: #eef; }
+        .list-item.active { background: #dcefff; border-left: 4px solid #007bff; }
+        .preview-area { flex: 1; background: #fff; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .preview-header { height: 40px; border-bottom: 1px solid #eee; background: #f9f9f9; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; font-size: 14px; flex-shrink: 0; }
+        .grid-container { flex: 1; overflow-y: auto; padding: 20px; background-color: #f5f5f5; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-content: start; }
+        .grid-card { background: white; border: 1px solid #ccc; border-radius: 6px; height: 400px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .card-title { padding: 8px 12px; background: #f8f8f8; border-bottom: 1px solid #eee; font-weight: bold; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+        .card-content { flex: 1; overflow: hidden; position: relative; display: block; }
+        iframe, video { width: 100%; height: 100%; border: none; display: block; }
+        .img-box { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #fff; }
+        .img-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .loading-text { display: flex; align-items: center; justify-content: center; height: 100%; color: #999; }
+        .empty-tips {color: #999;font-size: 20px;line-height: 1.8; /* 控制行高，值越小行间距越近 */margin: 0;}
+        .tips-container {text-align: center;}
+        .single-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center; /* 垂直居中 */
+        align-items: center;     /* 水平居中 */
+        height: 100%;            /* 确保容器有高度，才能垂直居中 */
+        min-height: 300px;       /* 或者根据实际情况给个最小高度 */
+        }
+        .user-info {
+        display: flex;
+        align-items: center;
+        gap: 10px; /* 元素间距 */
+        }
+        .user-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid #666;
+        object-fit: cover;
+        }
+        .user-name {
+            font-size: 13px;
+            color: #ddd;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .logout-btn {
+            color: #aaa;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+        .logout-btn:hover { color: #fff; }
+        /* === 分页导航栏样式 === */
+        .pagination-bar {
+            display:  flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            background:  #f8f8f8;
+            border-top: 1px solid #ddd;
+            flex-shrink: 0;
+            gap: 4px;
+            font-size: 11px;
+        }
+        .pagination-bar button {
+            padding:  3px 8px;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .pagination-bar button:hover:not(:disabled) {
+            background: #007bff;
+            color: #fff;
+            border-color: #007bff;
+        }
+        .pagination-bar button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .pagination-info {
+            color: #666;
+            margin:  0 6px;
+        }
+        .pagination-info.current-page {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .page-jump {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            margin-left: 6px;
+        }
+        .page-jump input {
+            width:  36px;
+            padding: 2px 4px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 11px;
+        }
+        .page-jump input:focus {
+            outline: none;
+            border-color:  #007bff;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="app" style="height:100%; display:flex; flex-direction:column;">
+            <header>
+        <!-- 1. 左侧：Logo -->
+        <div class="header-left">
+    <img src="/static/images/logo.png" alt="Logo" style="height: 22px; width: auto; margin-right: 10px;">
+    
+</div>
+
+        <!-- 2. 中间：切换按钮 -->
+        <div class="header-center">
+            <div class="btn-group">
+                {% raw %}
+                <button class="mode-btn" :class="{active: mode === 'single'}" @click="setMode('single')">单文件</button>
+                <button class="mode-btn" :class="{active: mode === 'global'}" @click="setMode('global')">全局预览</button>
+                {% endraw %}
+            </div>
+        </div>
+
+        <!-- 3. 右侧：用户信息 -->
+        <div class="header-right">
+            <!-- Flask 模板语法：判断 user 是否存在 -->
+            {% if user %}
+            <div class="user-info">
+                {#注释开始
+                {% if user.avatar %}
+                    <img class="user-avatar" src="{{ user.avatar }}" alt="avatar">
+                {% else %}
+                    <!-- 没有头像时的默认占位符 -->
+                    <div class="user-avatar" style="background:#555; display:flex; align-items:center; justify-content:center;">
+                        <i class="fas fa-user"></i>
+                    </div>
+                {% endif %}
+                注释结束#}
+                <span class="user-name">{{ user.name }}</span>
+                
+                <a href="/logout" title="退出登录" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+            {% else %}
+                <!-- 如果未登录（理论上被拦截了进不来，但为了防万一显示一个登录按钮） -->
+                <a href="/login" style="color:#007bff; text-decoration:none; font-size:14px;">
+                    登录 <i class="fas fa-arrow-right"></i>
+                </a>
+            {% endif %}
+        </div>
+    </header>
+
+    <div class="layout main-layout">
+        <div class="sidebar">
+            {% raw %}
+            <div class="nav-path">
+                 <div v-if="currentPath !== rootPath" 
+                     @click="goRoot" 
+                     style="color:#28a745; cursor:pointer; margin-bottom:8px; font-weight:bold;">
+                    <i class="fas fa-home"></i> 返回根目录
+                </div>
+                <div v-if="currentPath !== rootPath" @click="goUp" style="color:#007bff; cursor:pointer; margin-bottom:5px;">⬅ 返回上一级</div>
+                <div style="word-break: break-all; font-weight: 500;">
+            {{ currentPath.replace('s3://', '') }}
+</div>
+            </div>
+            <ul class="file-list">
+                <li v-if="loading" style="padding:15px; text-align:center; color:#999;">Loading...</li>
+                <li v-for="item in displayList" :key="item.path" 
+                    class="list-item"
+                    :class="{ active: mode === 'single' && selectedFile && selectedFile.path === item.path }"
+                    @click="handleItemClick(item)">
+                    <span style="margin-right:8px;">
+                        <i v-if="item.is_dir" class="fas fa-folder" style="color:#f39c12"></i>
+                        <i v-else class="fas fa-file-alt" style="color:#888"></i>
+                    </span>
+                    <span>{{ item.name }}</span>
+                </li>
+            </ul>
+            <!-- 分页导航栏 -->
+<div class="pagination-bar" v-if="pagination.total_pages > 1">
+    <button @click="goToPage(1)" :disabled="! pagination.has_prev" title="首页">
+        <i class="fas fa-angle-double-left"></i>
+    </button>
+    <button @click="goToPage(pagination. page - 1)" :disabled="!pagination.has_prev" title="上一页">
+        <i class="fas fa-angle-left"></i> 上一页
+    </button>
+    
+    <span class="pagination-info">
+        第 <span class="current-page">{{ pagination.page }}</span> / {{ pagination.total_pages }} 页
+        <span style="margin-left: 8px; color:#999;">(共 {{ pagination.total_count }} 项)</span>
+    </span>
+    
+    <button @click="goToPage(pagination.page + 1)" :disabled="!pagination.has_next" title="下一页">
+        下一页 <i class="fas fa-angle-right"></i>
+    </button>
+    <button @click="goToPage(pagination.total_pages)" :disabled="!pagination.has_next" title="末页">
+        <i class="fas fa-angle-double-right"></i>
+    </button>
+
+    <div class="page-jump">
+    <span>跳转</span>
+    <input type="number" v-model.number="jumpPage" :min="1" :max="pagination.total_pages" @keyup.enter="goToPage(jumpPage)">
+    <button @click="goToPage(jumpPage)">GO</button>
+</div>
+</div>
+
+<!-- 单页时显示简要信息 -->
+<div class="pagination-bar" v-else-if="! loading && pagination.total_count > 0" style="justify-content: center;">
+    <span style="color:#999;">共 {{ pagination.total_count }} 项</span>
+</div>
+            {% endraw %}
+        </div>
+
+        <div class="preview-area">
+            {% raw %}
+            <div v-if="mode === 'single'" style="height:100%; display:flex; flex-direction:column;">
+                <div class="preview-header">
+                    <b>{{ selectedFile ? selectedFile.name : '预览区' }}</b>
+                    <a v-if="selectedFile && !selectedFile.is_dir" :href="makeUrl(selectedFile.path)" target="_blank" style="font-size:12px;">下载</a>
+                </div>
+                <div class="single-container">
+                    <div v-if="!selectedFile" class="tips-container">
+                        <div class="empty-tips" style="font-weight: bold; color: #333;">默认打开pdd，需要打开其他bucket在URL里传</div>
+                        <div class="empty-tips">请在左侧选择文件</div>
+                        <div class="empty-tips">更新日志区</div>
+                        <div class="empty-tips">2025.12.23 - 流式传输视频 | 飞书权限认证</div>
+                        <div class="empty-tips">2026.1.6 - 多bucket打开(tos路径传参)</div>
+                        <div class="empty-tips">2026.1.8 - 页码导航栏 | 目录树缓存 </div>
+                        <div class="empty-tips">2026.1.20 - 支持mkv </div>
+                    </div>
+                    <file-viewer v-else :item="selectedFile"></file-viewer>
+                </div>
+            </div>
+
+            <div v-if="mode === 'global'" class="grid-container">
+                <div v-if="fileListOnly.length === 0" style="grid-column: 1 / -1; text-align:center; color:#999; margin-top:50px;">
+                    此文件夹下没有文件
+                </div>
+                <div v-for="file in fileListOnly" :key="file.path" class="grid-card">
+                    <div class="card-title">{{ file.name }}</div>
+                    <div class="card-content">
+                        <file-viewer :item="file"></file-viewer>
+                    </div>
+                </div>
+            </div>
+            {% endraw %}
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed, watch, onMounted } = Vue;
+
+    // === 文件查看组件 ===
+    const FileViewer = {
+        props: ['item'],
+        template: `
+            <div style="width:100%; height:100%;">
+                <video 
+                    v-if="type === 'video'" 
+                    :key="url"
+                    controls 
+                    autoplay
+                    style="width:100%; height:100%;"
+                >
+                    <source :src="url" type="video/mp4">
+                    您的浏览器不支持播放该视频。
+                </video>
+                <div v-else-if="type === 'image'" class="img-box"><img :src="url" loading="lazy"></div>
+                <iframe v-else :src="url" loading="lazy"></iframe>
+            </div>
+        `,
+        setup(props) {
+            const url = computed(() => `/api/preview?path=${encodeURIComponent(props.item.path)}`);
+            const ext = computed(() => props.item.name.split('.').pop().toLowerCase());
+            const isMkv = computed(() => ext.value === 'mkv');
+            const type = computed(() => {
+                if (['jpg', 'png', 'jpeg', 'gif', 'webp', 'svg'].includes(ext.value)) return 'image';
+                if (['mp4', 'webm', 'mov', 'ogg', 'mkv'].includes(ext.value)) return 'video';
+                return 'iframe_content';
+            });
+            return { url, type, isMkv };
+        }
+    };
+
+    // === 主程序 ===
+    createApp({
+        components: { FileViewer },
+        setup() {
+            const rootPath = '{{ root_bucket }}'; 
+            
+            // 后端判定好的: 父目录
+            const serverInitPath = '{{ init_path }}'; 
+            // 后端判定好的: 需要自动预览的文件 (如果有的话)
+            const serverAutoSelectFile = '{{ init_preview_file }}';
+
+            const currentPath = ref(rootPath);
+            const mode = ref('single');
+            const items = ref([]); 
+            const loading = ref(false);
+            const selectedFile = ref(null);
+
+            // 分页相关状态
+            const pagination = ref({
+                page:  1,
+                page_size: 100,
+                total_count: 0,
+                total_pages: 1,
+                has_prev: false,
+                has_next: false
+            });
+            const jumpPage = ref(1);
+
+            const s3ToUrl = (s3Path) => {
+                if (!s3Path) return '/';
+                let p = s3Path.replace('s3://', '/');
+                p = p.replace('tos://', '/');
+                p = p.replace('tos:/', '/');
+                return p;
+            };
+
+            const urlToS3 = (urlPath) => {
+                let path = decodeURIComponent(urlPath);
+                if (!path || path === '/') return rootPath;
+                if (path.startsWith('/')) path = path.substring(1);
+                
+                if (path.includes('tos://')) return path.substring(path.indexOf('tos://')).replace('tos://', 's3://');
+                if (path.includes('tos:/')) return path.substring(path.indexOf('tos:/')).replace('tos:/', 's3://');
+                if (path.startsWith('s3://')) return path;
+                if (path.startsWith('s3:/')) return path.replace('s3:/', 's3://');
+                return 's3://' + path;
+            };
+
+            // --- 数据加载 ---
+            const fetchList = async (s3Path, page = 1) => {
+    loading.value = true;
+    items.value = [];
+    try {
+        const res = await fetch(`/api/list?path=${encodeURIComponent(s3Path)}&page=${page}&page_size=100`);
+        const data = await res.json();
+        if (data.status === 'success') {
+            items.value = data.data;
+            currentPath.value = data. current_path;
+            
+            // 更新分页信息
+            if (data.pagination) {
+                pagination.value = data.pagination;
+                jumpPage. value = data.pagination. page;
+            }
+
+            // 自动触发预览
+            if (serverAutoSelectFile && !selectedFile.value && page === 1) {
+                const target = items.value.find(i => i.path === serverAutoSelectFile);
+                if (target) {
+                    selectedFile.value = target;
+                } else {
+                    selectedFile. value = {
+                        name:  serverAutoSelectFile. split('/').pop(),
+                        path: serverAutoSelectFile,
+                        is_dir: false
+                    };
+                }
+            }
+
+        } else {
+            console.error("Path error:", data.message);
+        }
+    } catch(e) { console.error(e); } finally { loading.value = false; }
+};
+            const goToPage = (page) => {
+            page = Math.max(1, Math.min(page, pagination.value.total_pages));
+            if (page === pagination.value.page) return;
+            
+            fetchList(currentPath.value, page);
+            selectedFile.value = null;
+        };
+
+            const navigateTo = (s3Path) => {
+                fetchList(s3Path);
+                const url = s3ToUrl(s3Path);
+                window.history.pushState({ s3Path }, '', url);
+            };
+
+            // --- 初始化 ---
+            onMounted(() => {
+                const currentUrlPath = window.location.pathname;
+                
+                // 1. 优先使用后端计算好的路径 (init_path)
+                if (serverInitPath && serverInitPath !== rootPath) {
+                    fetchList(serverInitPath);
+                    // 不修改 URL，保持参数显示
+                }
+                // 2. 其次看 URL Path 是否有子路径
+                else if (currentUrlPath !== '/' && currentUrlPath !== '') {
+                    const s3Path = urlToS3(currentUrlPath);
+                    fetchList(s3Path);
+                }
+                // 3. 默认首页
+                else {
+                    fetchList(rootPath);
+                    window.history.replaceState({ s3Path: rootPath }, '', s3ToUrl(rootPath));
+                }
+
+                window.addEventListener('popstate', () => {
+                    const path = window.location.pathname;
+                    const s3Path = (path === '/' || path === '') ? rootPath : urlToS3(path);
+                    fetchList(s3Path);
+                    selectedFile.value = null;
+                });
+            });
+
+            const displayList = computed(() => mode.value === 'global' ? items.value.filter(i => i.is_dir) : items.value);
+            const fileListOnly = computed(() => items.value.filter(i => !i.is_dir));
+
+            const handleItemClick = (item) => {
+                if (item.is_dir) {
+                    navigateTo(item.path);
+                    selectedFile.value = null;
+                } else {
+                    if (mode.value === 'single') selectedFile.value = item;
+                }
+            };
+             const goRoot = () => {
+                if (currentPath.value === rootPath) return;
+                navigateTo(rootPath);
+            };
+            const goUp = () => {
+                if (currentPath.value === rootPath) return;
+                let p = currentPath.value.replace(/\/+$/, '');
+                p = p.substring(0, p.lastIndexOf('/'));
+                if (p.length < rootPath.length || !p.includes('://')) p = rootPath;
+                navigateTo(p);
+            };
+
+            const setMode = (m) => {
+                mode.value = m;
+                selectedFile.value = null;
+            };
+
+            const makeUrl = (path) => `/api/preview?path=${encodeURIComponent(path)}`;
+
+            return {
+                 rootPath, currentPath, mode, loading, displayList, fileListOnly, selectedFile,
+                handleItemClick, goUp, setMode, makeUrl, goRoot,
+                pagination, jumpPage, goToPage
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
